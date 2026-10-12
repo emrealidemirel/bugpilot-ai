@@ -1,0 +1,52 @@
+{
+  "analysis": {
+    "severity": "high",
+    "severityReason": "The issue blocks an important user flow.",
+    "priority": "p1",
+    "priorityReason": "The issue should be addressed quickly.",
+    "reproductionSteps": [
+      "Open the application",
+      "Navigate to the login screen",
+      "Enter valid credentials",
+      "Tap Login",
+      "Observe the loading state"
+    ],
+    "testCases": [
+      {
+        "id": "TC-01",
+        "type": "positive",
+        "title": "Valid login completes successfully",
+        "given": "A registered user is on the login screen",
+        "when": "Valid credentials are submitted",
+        "then": "The user should reach the dashboard"
+      },
+      {
+        "id": "TC-02",
+        "type": "negative",
+        "title": "Invalid login shows an error",
+        "given": "A user enters invalid credentials",
+        "when": "The login form is submitted",
+        "then": "The app should show a clear error message"
+      },
+      {
+        "id": "TC-03",
+        "type": "edgeCase",
+        "title": "Repeated login taps remain stable",
+        "given": "A valid user taps the login button multiple times",
+        "when": "Authentication requests finish out of order",
+        "then": "The screen should not remain stuck loading"
+      }
+    ],
+    "possibleRootCause": "The loading state may not be reset after the asynchronous authentication call completes.",
+    "rootCauseConfidence": 0.72,
+    "missingInformation": [
+      "Device model was not provided."
+    ],
+    "qualityScore": 82
+  },
+  "meta": {
+    "requestId": "req_123",
+    "model": "backend-owned-model",
+    "processingTimeMs": 1240
+  }
+}

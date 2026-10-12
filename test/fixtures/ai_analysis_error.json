@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "RATE_LIMITED",
+    "message": "The analysis service is receiving too many requests.",
+    "requestId": "req_429"
+  }
+}
