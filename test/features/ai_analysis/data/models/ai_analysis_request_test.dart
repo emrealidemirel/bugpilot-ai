@@ -1,7 +1,7 @@
-import 'package:bugpilot_ai/features/ai_analysis/data/models/ai_analysis_request.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_platform.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_status.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/models/bug_report.dart';
+import 'package:bugpilot_ai/models/ai_analysis_request.dart';
+import 'package:bugpilot_ai/models/bug_platform.dart';
+import 'package:bugpilot_ai/models/bug_status.dart';
+import 'package:bugpilot_ai/models/bug_report.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -22,6 +22,7 @@ void main() {
       );
 
       expect(request.toJson(), {
+        'language': 'en',
         'title': 'Login button stuck loading',
         'description': 'The login screen remains loading.',
         'expectedBehavior': 'The dashboard should open.',
@@ -47,6 +48,7 @@ void main() {
       );
 
       expect(request.toJson(), {
+        'language': 'en',
         'title': 'Title',
         'description': 'Description',
         'expectedBehavior': 'Expected',
@@ -60,6 +62,7 @@ void main() {
       final request = AiAnalysisRequest.fromBugReport(_bugReport());
 
       expect(request.toJson(), {
+        'language': 'en',
         'title': 'Crash on launch',
         'description': 'The app crashes immediately after launch.',
         'expectedBehavior': 'The dashboard should open.',

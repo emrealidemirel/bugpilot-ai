@@ -1,24 +1,19 @@
-import 'package:bugpilot_ai/features/bug_reports/data/repositories/in_memory_bug_repository.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_platform.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_priority.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_severity.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_status.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/models/bug_report.dart';
+import 'package:bugpilot_ai/repositories/in_memory_bug_repository.dart';
+import 'package:bugpilot_ai/models/bug_platform.dart';
+import 'package:bugpilot_ai/models/bug_priority.dart';
+import 'package:bugpilot_ai/models/bug_severity.dart';
+import 'package:bugpilot_ai/models/bug_status.dart';
+import 'package:bugpilot_ai/models/bug_report.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('InMemoryBugRepository', () {
-    test('starts with seeded sample bugs', () async {
+    test('starts empty unless reports are explicitly provided', () async {
       final repository = InMemoryBugRepository();
 
       final bugs = await repository.getBugs();
 
-      expect(bugs, hasLength(5));
-      expect(bugs.first.id, 'bug-001');
-      expect(
-        bugs.map((bug) => bug.title),
-        contains('Checkout confirmation email is not sent'),
-      );
+      expect(bugs, isEmpty);
     });
 
     test('gets all bugs as an unmodifiable list', () async {

@@ -1,13 +1,13 @@
 import 'dart:convert';
 
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_platform.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_priority.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_severity.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_status.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/models/bug_report.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/models/bug_screenshot.dart';
-import 'package:bugpilot_ai/features/duplicate_detection/data/models/duplicate_check_request.dart';
-import 'package:bugpilot_ai/features/duplicate_detection/domain/models/similar_bug_candidate.dart';
+import 'package:bugpilot_ai/models/bug_platform.dart';
+import 'package:bugpilot_ai/models/bug_priority.dart';
+import 'package:bugpilot_ai/models/bug_severity.dart';
+import 'package:bugpilot_ai/models/bug_status.dart';
+import 'package:bugpilot_ai/models/bug_report.dart';
+import 'package:bugpilot_ai/models/bug_screenshot.dart';
+import 'package:bugpilot_ai/models/duplicate_check_request.dart';
+import 'package:bugpilot_ai/models/similar_bug_candidate.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -31,6 +31,7 @@ void main() {
     );
 
     final json = request.toJson();
+    expect(json['language'], 'en');
     expect(json['bug'], {
       'title': 'Login button stuck loading',
       'description': 'The login screen remains loading.',

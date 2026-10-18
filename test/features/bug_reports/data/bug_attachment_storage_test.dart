@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:bugpilot_ai/features/bug_reports/data/storage/bug_attachment_storage.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/models/bug_screenshot.dart';
+import 'package:bugpilot_ai/services/bug_attachment_storage.dart';
+import 'package:bugpilot_ai/models/bug_screenshot.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 

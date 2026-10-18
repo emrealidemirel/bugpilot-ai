@@ -1,4 +1,4 @@
-import 'package:bugpilot_ai/features/bug_reports/data/storage/bug_screenshot_validator.dart';
+import 'package:bugpilot_ai/services/bug_screenshot_validator.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

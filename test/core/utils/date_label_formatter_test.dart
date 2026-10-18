@@ -1,4 +1,4 @@
-import 'package:bugpilot_ai/core/utils/date_label_formatter.dart';
+import 'package:bugpilot_ai/utils/date_label_formatter.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

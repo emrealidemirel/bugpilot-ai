@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "170511411889",
+    "project_id": "bugpilot-ai",
+    "storage_bucket": "bugpilot-ai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:170511411889:android:982c3609197d399bf1d090",
+        "android_client_info": {
+          "package_name": "com.example.bugpilot_ai"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "170511411889-kq4h4o3a1spe3sjp31v17ngnrsn3hsbs.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCty7qoXHZPGT17NxXUgh4H7sML1IS8YcU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "170511411889-kq4h4o3a1spe3sjp31v17ngnrsn3hsbs.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "170511411889-vmqvf1d9o5qo2q5hmjlatkm1toi7eolm.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.bugpilotAi"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,12 +1,12 @@
 import 'dart:io';
 
-import 'package:bugpilot_ai/features/bug_reports/data/repositories/hive_bug_repository.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_platform.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_status.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/models/bug_report.dart';
-import 'package:bugpilot_ai/features/settings/data/repositories/persistent_settings_repository.dart';
-import 'package:bugpilot_ai/features/settings/domain/models/app_settings.dart';
-import 'package:bugpilot_ai/features/settings/domain/models/app_theme_mode.dart';
+import 'package:bugpilot_ai/repositories/hive_bug_repository.dart';
+import 'package:bugpilot_ai/models/bug_platform.dart';
+import 'package:bugpilot_ai/models/bug_status.dart';
+import 'package:bugpilot_ai/models/bug_report.dart';
+import 'package:bugpilot_ai/repositories/persistent_settings_repository.dart';
+import 'package:bugpilot_ai/models/app_settings.dart';
+import 'package:bugpilot_ai/models/app_theme_mode.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive_ce.dart';
 

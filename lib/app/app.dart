@@ -1,24 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:go_router/go_router.dart';
+import 'dart:async';
 
-import 'config/app_config.dart';
-import '../l10n/generated/app_localizations.dart';
-import '../features/ai_analysis/data/clients/http_ai_analysis_api_client.dart';
-import '../features/ai_analysis/data/services/mock_ai_bug_analysis_service.dart';
-import '../features/ai_analysis/data/services/remote_ai_bug_analysis_service.dart';
-import '../features/ai_analysis/domain/services/ai_bug_analysis_service.dart';
-import '../features/bug_reports/data/repositories/in_memory_bug_repository.dart';
-import '../features/bug_reports/domain/repositories/bug_repository.dart';
-import '../features/duplicate_detection/data/clients/http_duplicate_detection_api_client.dart';
-import '../features/duplicate_detection/data/services/mock_bug_duplicate_detection_service.dart';
-import '../features/duplicate_detection/data/services/remote_bug_duplicate_detection_service.dart';
-import '../features/duplicate_detection/domain/services/bug_duplicate_detection_service.dart';
-import '../features/settings/data/repositories/in_memory_settings_repository.dart';
-import '../features/settings/domain/models/app_theme_mode.dart' as settings;
-import '../features/settings/presentation/controllers/settings_controller.dart';
-import 'localization/locale_controller.dart';
-import 'localization/locale_controller_scope.dart';
-import 'router/app_router.dart';
-import 'theme/app_theme.dart';
+import 'package:bugpilot_ai/constants/app_config.dart';
+import 'package:bugpilot_ai/services/auth_service.dart';
+import 'package:bugpilot_ai/models/auth_user.dart';
+import 'package:bugpilot_ai/widgets/auth_service_scope.dart';
+import 'package:bugpilot_ai/services/openai_responses_client.dart';
+import 'package:bugpilot_ai/services/mock_ai_bug_analysis_service.dart';
+import 'package:bugpilot_ai/services/remote_ai_bug_analysis_service.dart';
+import 'package:bugpilot_ai/services/ai_bug_analysis_service.dart';
+import 'package:bugpilot_ai/repositories/in_memory_bug_repository.dart';
+import 'package:bugpilot_ai/repositories/bug_repository.dart';
+import 'package:bugpilot_ai/services/mock_bug_duplicate_detection_service.dart';
+import 'package:bugpilot_ai/services/remote_bug_duplicate_detection_service.dart';
+import 'package:bugpilot_ai/services/bug_duplicate_detection_service.dart';
+import 'package:bugpilot_ai/repositories/in_memory_settings_repository.dart';
+import 'package:bugpilot_ai/models/app_theme_mode.dart' as settings;
+import 'package:bugpilot_ai/controllers/settings_controller.dart';
+import 'package:bugpilot_ai/app/router/app_router.dart';
+import 'package:bugpilot_ai/theme/app_theme.dart';
 
 class BugPilotApp extends StatefulWidget {
   const BugPilotApp({
@@ -26,6 +28,10 @@ class BugPilotApp extends StatefulWidget {
     this.aiAnalysisService,
     this.duplicateDetectionService,
     this.settingsController,
+    this.authService,
+    this.requireAuthentication = false,
+    this.initialLocale,
+    this.saveLocale = true,
     super.key,
   });
 
@@ -33,13 +39,16 @@ class BugPilotApp extends StatefulWidget {
   final AiBugAnalysisService? aiAnalysisService;
   final BugDuplicateDetectionService? duplicateDetectionService;
   final SettingsController? settingsController;
+  final AuthService? authService;
+  final bool requireAuthentication;
+  final Locale? initialLocale;
+  final bool saveLocale;
 
   @override
   State<BugPilotApp> createState() => _BugPilotAppState();
 }
 
 class _BugPilotAppState extends State<BugPilotApp> {
-  late final LocaleController _localeController;
   late final BugRepository _bugRepository;
   late final AiBugAnalysisService _aiAnalysisService;
   late final BugDuplicateDetectionService _duplicateDetectionService;
@@ -47,12 +56,14 @@ class _BugPilotAppState extends State<BugPilotApp> {
   late final bool _ownsSettingsController;
   late final ValueNotifier<int> _reportResetSignal;
   late final ValueNotifier<int> _bugRefreshSignal;
-  late final RouterConfig<Object> _router;
+  late final ValueNotifier<int> _authRefreshSignal;
+  late final Stream<AuthUser?>? _authUserChanges;
+  StreamSubscription<Object?>? _authSubscription;
+  late final GoRouter _router;
 
   @override
   void initState() {
     super.initState();
-    _localeController = LocaleController();
     _bugRepository = widget.bugRepository ?? InMemoryBugRepository();
     _aiAnalysisService = widget.aiAnalysisService ?? _createAiAnalysisService();
     _duplicateDetectionService =
@@ -63,6 +74,11 @@ class _BugPilotAppState extends State<BugPilotApp> {
     _ownsSettingsController = widget.settingsController == null;
     _reportResetSignal = ValueNotifier<int>(0);
     _bugRefreshSignal = ValueNotifier<int>(0);
+    _authRefreshSignal = ValueNotifier<int>(0);
+    _authUserChanges = widget.authService?.userChanges;
+    _authSubscription = _authUserChanges?.listen((_) {
+      _authRefreshSignal.value++;
+    });
     _router = createAppRouter(
       bugRepository: _bugRepository,
       aiAnalysisService: _aiAnalysisService,
@@ -70,6 +86,9 @@ class _BugPilotAppState extends State<BugPilotApp> {
       settingsController: _settingsController,
       reportResetSignal: _reportResetSignal,
       bugRefreshSignal: _bugRefreshSignal,
+      authService: widget.authService,
+      requireAuthentication: widget.requireAuthentication,
+      authRefreshSignal: _authRefreshSignal,
       onBugChanged: () {
         _bugRefreshSignal.value++;
       },
@@ -86,8 +105,9 @@ class _BugPilotAppState extends State<BugPilotApp> {
     }
 
     return RemoteAiBugAnalysisService(
-      apiClient: HttpAiAnalysisApiClient(
-        baseUrl: Uri.parse(AppConfig.apiBaseUrl),
+      apiClient: OpenAiResponsesClient(
+        apiKey: AppConfig.openAiApiKey,
+        model: AppConfig.openAiModel,
         timeout: AppConfig.aiAnalysisTimeout,
       ),
     );
@@ -99,8 +119,9 @@ class _BugPilotAppState extends State<BugPilotApp> {
     }
 
     return RemoteBugDuplicateDetectionService(
-      apiClient: HttpDuplicateDetectionApiClient(
-        baseUrl: Uri.parse(AppConfig.apiBaseUrl),
+      apiClient: OpenAiResponsesClient(
+        apiKey: AppConfig.openAiApiKey,
+        model: AppConfig.openAiModel,
         timeout: AppConfig.duplicateCheckTimeout,
       ),
     );
@@ -108,33 +129,50 @@ class _BugPilotAppState extends State<BugPilotApp> {
 
   @override
   void dispose() {
-    _localeController.dispose();
+    _router.dispose();
     if (_ownsSettingsController) {
       _settingsController.dispose();
     }
     _reportResetSignal.dispose();
     _bugRefreshSignal.dispose();
+    _authSubscription?.cancel();
+    _authRefreshSignal.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return LocaleControllerScope(
-      controller: _localeController,
+    return EasyLocalization(
+      supportedLocales: const [Locale('en'), Locale('tr')],
+      path: 'assets/translations',
+      fallbackLocale: const Locale('en'),
+      startLocale: widget.initialLocale,
+      saveLocale: widget.saveLocale,
+      useOnlyLangCode: true,
       child: AnimatedBuilder(
-        animation: Listenable.merge([_localeController, _settingsController]),
+        animation: _settingsController,
         builder: (context, child) {
-          return MaterialApp.router(
-            title: 'BugPilot AI',
-            onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.light,
-            darkTheme: AppTheme.dark,
-            themeMode: _themeModeFor(_settingsController.settings.themeMode),
-            locale: _localeController.locale,
-            supportedLocales: AppLocalizations.supportedLocales,
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            routerConfig: _router,
+          return StreamBuilder(
+            stream: _authUserChanges,
+            initialData: widget.authService?.currentUser,
+            builder: (context, snapshot) => AuthServiceScope(
+              service: widget.authService,
+              user: snapshot.data,
+              child: MaterialApp.router(
+                title: 'BugPilot AI',
+                onGenerateTitle: (context) => 'appTitle'.tr(),
+                debugShowCheckedModeBanner: false,
+                theme: AppTheme.light,
+                darkTheme: AppTheme.dark,
+                themeMode: _themeModeFor(
+                  _settingsController.settings.themeMode,
+                ),
+                locale: context.locale,
+                supportedLocales: context.supportedLocales,
+                localizationsDelegates: context.localizationDelegates,
+                routerConfig: _router,
+              ),
+            ),
           );
         },
       ),

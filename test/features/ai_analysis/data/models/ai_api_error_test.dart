@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:bugpilot_ai/features/ai_analysis/data/exceptions/ai_analysis_exception.dart';
-import 'package:bugpilot_ai/features/ai_analysis/data/models/ai_api_error.dart';
+import 'package:bugpilot_ai/services/ai_analysis_exception.dart';
+import 'package:bugpilot_ai/models/ai_api_error.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -37,7 +37,7 @@ void main() {
       );
       expect(
         _messageFor('NETWORK_ERROR'),
-        'Could not connect to AI analysis. Check your connection and backend URL.',
+        'Could not connect to OpenAI. Check your internet connection.',
       );
       expect(
         _messageFor('UNKNOWN_FUTURE_CODE'),

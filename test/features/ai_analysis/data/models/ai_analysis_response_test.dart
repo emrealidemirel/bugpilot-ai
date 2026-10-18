@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:bugpilot_ai/features/ai_analysis/data/models/ai_analysis_response.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_priority.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_severity.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_test_case_type.dart';
+import 'package:bugpilot_ai/models/ai_analysis_response.dart';
+import 'package:bugpilot_ai/models/bug_priority.dart';
+import 'package:bugpilot_ai/models/bug_severity.dart';
+import 'package:bugpilot_ai/models/bug_test_case_type.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

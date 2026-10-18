@@ -1,43 +1,46 @@
 import 'package:bugpilot_ai/app/app.dart';
-import 'package:bugpilot_ai/features/ai_analysis/data/services/mock_ai_bug_analysis_service.dart';
-import 'package:bugpilot_ai/features/bug_reports/data/repositories/in_memory_bug_repository.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_platform.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_priority.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_severity.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_status.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_test_case_type.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/models/bug_report.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/models/bug_test_case.dart';
+import 'package:bugpilot_ai/services/mock_ai_bug_analysis_service.dart';
+import 'package:bugpilot_ai/repositories/in_memory_bug_repository.dart';
+import 'package:bugpilot_ai/models/bug_platform.dart';
+import 'package:bugpilot_ai/models/bug_priority.dart';
+import 'package:bugpilot_ai/models/bug_severity.dart';
+import 'package:bugpilot_ai/models/bug_status.dart';
+import 'package:bugpilot_ai/models/bug_test_case_type.dart';
+import 'package:bugpilot_ai/models/bug_report.dart';
+import 'package:bugpilot_ai/models/bug_test_case.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
     binding.platformDispatcher.localeTestValue = const Locale('en');
-  });
-
-  tearDown(() {
-    binding.platformDispatcher.clearLocaleTestValue();
+    await rootBundle.loadString('assets/translations/en.json');
+    await rootBundle.loadString('assets/translations/tr.json');
+    await EasyLocalization.ensureInitialized();
   });
 
   testWidgets('renders bug reports list and opens detail', (tester) async {
     final repository = InMemoryBugRepository(seedBugs: [_analyzedBug()]);
 
     await tester.pumpWidget(_app(repository));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
 
     await tester.tap(find.text('BUGS'));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
 
-    expect(find.text('Bugs'), findsWidgets);
+    expect(find.text('Search bugs...'), findsWidgets);
     expect(find.text('Search bugs...'), findsOneWidget);
     expect(find.text('OPEN'), findsWidgets);
     expect(find.text('Login button stuck loading'), findsOneWidget);
 
     await tester.tap(find.text('Login button stuck loading'));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
 
     expect(find.text('Expected Behavior'), findsOneWidget);
     expect(find.text('Actual Behavior'), findsOneWidget);
@@ -51,11 +54,11 @@ void main() {
     final repository = InMemoryBugRepository(seedBugs: [_manualBug()]);
 
     await tester.pumpWidget(_app(repository));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
     await tester.tap(find.text('BUGS'));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
     await tester.tap(find.text('Manual profile issue'));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
 
     expect(find.text('UNTRIAGED'), findsOneWidget);
     expect(find.text('UNPRIORITIZED'), findsOneWidget);
@@ -68,15 +71,15 @@ void main() {
     final repository = InMemoryBugRepository(seedBugs: [_analyzedBug()]);
 
     await tester.pumpWidget(_app(repository));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
     await _openDetail(tester);
 
     await tester.tap(find.byIcon(Icons.more_vert));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
     await tester.tap(find.text('Change Status'));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
     await tester.tap(find.text('Resolved').last);
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
 
     final bug = await repository.getBugById('bug-001');
     expect(bug?.status, BugStatus.resolved);
@@ -87,13 +90,13 @@ void main() {
     final repository = InMemoryBugRepository(seedBugs: [_analyzedBug()]);
 
     await tester.pumpWidget(_app(repository));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
     await _openDetail(tester);
 
     await tester.tap(find.byIcon(Icons.more_vert));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
     await tester.tap(find.text('Edit'));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
 
     expect(find.text('Edit Bug'), findsOneWidget);
     expect(
@@ -107,7 +110,7 @@ void main() {
     );
     await tester.ensureVisible(find.text('Save Changes'));
     await tester.tap(find.text('Save Changes'));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
 
     final bug = await repository.getBugById('bug-001');
     expect(bug?.title, 'Login button never finishes');
@@ -120,12 +123,12 @@ void main() {
     final repository = InMemoryBugRepository(seedBugs: [_analyzedBug()]);
 
     await tester.pumpWidget(_app(repository));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
     await _openDetail(tester);
     await tester.tap(find.byIcon(Icons.more_vert));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
     await tester.tap(find.text('Edit'));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
 
     await tester.enterText(
       find.widgetWithText(TextFormField, 'Login button stuck loading'),
@@ -133,7 +136,7 @@ void main() {
     );
     await tester.ensureVisible(find.text('Save Changes'));
     await tester.tap(find.text('Save Changes'));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
 
     final bug = await repository.getBugById('bug-001');
     expect(bug?.title, 'Login button stuck loading');
@@ -144,35 +147,37 @@ void main() {
     final repository = InMemoryBugRepository(seedBugs: [_analyzedBug()]);
 
     await tester.pumpWidget(_app(repository));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
     await _openDetail(tester);
 
     await tester.tap(find.byIcon(Icons.more_vert));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
     await tester.tap(find.text('Delete'));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
 
     expect(find.text('Delete bug report?'), findsOneWidget);
 
     await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
     expect(await repository.getBugById('bug-001'), isNotNull);
 
     await tester.tap(find.byIcon(Icons.more_vert));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
     await tester.tap(find.text('Delete'));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
     await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
 
     expect(await repository.getBugById('bug-001'), isNull);
-    expect(find.text('Bugs'), findsWidgets);
+    expect(find.text('Search bugs...'), findsWidgets);
     expect(find.text('Bug report deleted.'), findsOneWidget);
   });
 }
 
 Widget _app(InMemoryBugRepository repository) {
   return BugPilotApp(
+    initialLocale: const Locale('en'),
+    saveLocale: false,
     bugRepository: repository,
     aiAnalysisService: const MockAiBugAnalysisService(delay: Duration.zero),
   );
@@ -230,4 +235,9 @@ BugReport _manualBug() {
     createdAt: DateTime.utc(2026, 8, 18, 9),
     updatedAt: DateTime.utc(2026, 8, 18, 9),
   );
+}
+
+Future<void> _settleTranslations(WidgetTester tester) async {
+  await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+  await tester.pumpAndSettle();
 }

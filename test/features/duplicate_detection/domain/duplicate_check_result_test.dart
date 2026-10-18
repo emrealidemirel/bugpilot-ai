@@ -1,4 +1,4 @@
-import 'package:bugpilot_ai/features/duplicate_detection/domain/models/duplicate_check_result.dart';
+import 'package:bugpilot_ai/models/duplicate_check_result.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

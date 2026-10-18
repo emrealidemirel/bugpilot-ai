@@ -1,8 +1,8 @@
-import 'package:bugpilot_ai/features/ai_analysis/domain/models/ai_bug_analysis.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_priority.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_severity.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_test_case_type.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/models/bug_test_case.dart';
+import 'package:bugpilot_ai/models/ai_bug_analysis.dart';
+import 'package:bugpilot_ai/models/bug_priority.dart';
+import 'package:bugpilot_ai/models/bug_severity.dart';
+import 'package:bugpilot_ai/models/bug_test_case_type.dart';
+import 'package:bugpilot_ai/models/bug_test_case.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

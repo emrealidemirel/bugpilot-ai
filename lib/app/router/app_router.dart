@@ -2,25 +2,22 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/widgets/app_shell.dart';
-import '../../features/ai_analysis/domain/services/ai_bug_analysis_service.dart';
-import '../../features/ai_analysis/presentation/pages/ai_analysis_page.dart';
-import '../../features/bug_reports/domain/models/bug_report.dart';
-import '../../features/bug_reports/domain/repositories/bug_repository.dart';
-import '../../features/bug_reports/presentation/pages/bug_detail_page.dart';
-import '../../features/bug_reports/presentation/pages/bug_reports_page.dart';
-import '../../features/bug_reports/presentation/pages/edit_bug_page.dart';
-import '../../features/dashboard/presentation/pages/dashboard_page.dart';
-import '../../features/duplicate_detection/domain/services/bug_duplicate_detection_service.dart';
-import '../../features/report_bug/presentation/pages/report_bug_page.dart';
-import '../../features/settings/presentation/pages/settings_page.dart';
-import '../../features/settings/presentation/controllers/settings_controller.dart';
-
-final _rootNavigatorKey = GlobalKey<NavigatorState>();
-final _dashboardNavigatorKey = GlobalKey<NavigatorState>();
-final _bugsNavigatorKey = GlobalKey<NavigatorState>();
-final _reportNavigatorKey = GlobalKey<NavigatorState>();
-final _settingsNavigatorKey = GlobalKey<NavigatorState>();
+import 'package:bugpilot_ai/widgets/app_shell.dart';
+import 'package:bugpilot_ai/services/ai_bug_analysis_service.dart';
+import 'package:bugpilot_ai/services/auth_service.dart';
+import 'package:bugpilot_ai/pages/auth/sign_in_page.dart';
+import 'package:bugpilot_ai/pages/auth/profile_page.dart';
+import 'package:bugpilot_ai/pages/ai_analysis/ai_analysis_page.dart';
+import 'package:bugpilot_ai/models/bug_report.dart';
+import 'package:bugpilot_ai/repositories/bug_repository.dart';
+import 'package:bugpilot_ai/pages/bug_reports/bug_detail_page.dart';
+import 'package:bugpilot_ai/pages/bug_reports/bug_reports_page.dart';
+import 'package:bugpilot_ai/pages/bug_reports/edit_bug_page.dart';
+import 'package:bugpilot_ai/pages/dashboard/dashboard_page.dart';
+import 'package:bugpilot_ai/services/bug_duplicate_detection_service.dart';
+import 'package:bugpilot_ai/pages/report_bug/report_bug_page.dart';
+import 'package:bugpilot_ai/pages/settings/settings_page.dart';
+import 'package:bugpilot_ai/controllers/settings_controller.dart';
 
 GoRouter createAppRouter({
   required BugRepository bugRepository,
@@ -31,19 +28,45 @@ GoRouter createAppRouter({
   required ValueListenable<int> bugRefreshSignal,
   required VoidCallback onBugChanged,
   required VoidCallback onBugSaved,
+  AuthService? authService,
+  bool requireAuthentication = false,
+  Listenable? authRefreshSignal,
 }) {
+  final rootNavigatorKey = GlobalKey<NavigatorState>();
+  final dashboardNavigatorKey = GlobalKey<NavigatorState>();
+  final bugsNavigatorKey = GlobalKey<NavigatorState>();
+  final reportNavigatorKey = GlobalKey<NavigatorState>();
+  final settingsNavigatorKey = GlobalKey<NavigatorState>();
+
   return GoRouter(
-    navigatorKey: _rootNavigatorKey,
+    navigatorKey: rootNavigatorKey,
     initialLocation: DashboardPage.routePath,
+    refreshListenable: authRefreshSignal,
+    redirect: (context, state) {
+      if (!requireAuthentication) return null;
+      final isSignIn = state.uri.path == SignInPage.routePath;
+      if (authService?.currentUser == null) {
+        return isSignIn ? null : SignInPage.routePath;
+      }
+      return isSignIn ? DashboardPage.routePath : null;
+    },
     routes: [
+      GoRoute(
+        path: SignInPage.routePath,
+        builder: (context, state) => SignInPage(authService: authService),
+      ),
       GoRoute(path: '/', redirect: (context, state) => DashboardPage.routePath),
+      GoRoute(
+        path: ProfilePage.routePath,
+        builder: (context, state) => const ProfilePage(),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return AppShell(navigationShell: navigationShell);
         },
         branches: [
           StatefulShellBranch(
-            navigatorKey: _dashboardNavigatorKey,
+            navigatorKey: dashboardNavigatorKey,
             routes: [
               GoRoute(
                 path: DashboardPage.routePath,
@@ -57,7 +80,7 @@ GoRouter createAppRouter({
             ],
           ),
           StatefulShellBranch(
-            navigatorKey: _bugsNavigatorKey,
+            navigatorKey: bugsNavigatorKey,
             routes: [
               GoRoute(
                 path: BugReportsPage.routePath,
@@ -92,7 +115,7 @@ GoRouter createAppRouter({
             ],
           ),
           StatefulShellBranch(
-            navigatorKey: _reportNavigatorKey,
+            navigatorKey: reportNavigatorKey,
             routes: [
               GoRoute(
                 path: ReportBugPage.routePath,
@@ -122,7 +145,7 @@ GoRouter createAppRouter({
             ],
           ),
           StatefulShellBranch(
-            navigatorKey: _settingsNavigatorKey,
+            navigatorKey: settingsNavigatorKey,
             routes: [
               GoRoute(
                 path: SettingsPage.routePath,

@@ -1,24 +1,88 @@
-import 'package:bugpilot_ai/app/theme/app_theme.dart';
-import 'package:bugpilot_ai/features/ai_analysis/domain/models/ai_bug_analysis.dart';
-import 'package:bugpilot_ai/features/ai_analysis/domain/models/ai_analysis_preferences.dart';
-import 'package:bugpilot_ai/features/ai_analysis/domain/services/ai_bug_analysis_service.dart';
-import 'package:bugpilot_ai/features/ai_analysis/presentation/pages/ai_analysis_page.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_platform.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_priority.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_severity.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_status.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_test_case_type.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/models/bug_report.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/models/bug_test_case.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/repositories/bug_repository.dart';
-import 'package:bugpilot_ai/features/settings/data/repositories/in_memory_settings_repository.dart';
-import 'package:bugpilot_ai/features/settings/domain/models/app_settings.dart';
-import 'package:bugpilot_ai/features/settings/presentation/controllers/settings_controller.dart';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:easy_localization/easy_localization.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:bugpilot_ai/theme/app_theme.dart';
+import 'package:bugpilot_ai/models/ai_bug_analysis.dart';
+import 'package:bugpilot_ai/models/ai_analysis_preferences.dart';
+import 'package:bugpilot_ai/services/ai_bug_analysis_service.dart';
+import 'package:bugpilot_ai/pages/ai_analysis/ai_analysis_page.dart';
+import 'package:bugpilot_ai/models/bug_platform.dart';
+import 'package:bugpilot_ai/models/bug_priority.dart';
+import 'package:bugpilot_ai/models/bug_severity.dart';
+import 'package:bugpilot_ai/models/bug_status.dart';
+import 'package:bugpilot_ai/models/bug_test_case_type.dart';
+import 'package:bugpilot_ai/models/bug_report.dart';
+import 'package:bugpilot_ai/models/bug_test_case.dart';
+import 'package:bugpilot_ai/repositories/bug_repository.dart';
+import 'package:bugpilot_ai/repositories/in_memory_settings_repository.dart';
+import 'package:bugpilot_ai/models/app_settings.dart';
+import 'package:bugpilot_ai/controllers/settings_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
+    await EasyLocalization.ensureInitialized();
+  });
+
+  for (final language in ['tr', 'en']) {
+    testWidgets('first automatic analysis works in $language', (tester) async {
+      final service = _FakeAnalysisService(result: _analysis());
+      final controller = SettingsController(
+        repository: InMemorySettingsRepository(),
+      );
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(
+        EasyLocalization(
+          supportedLocales: const [Locale('tr'), Locale('en')],
+          startLocale: Locale(language),
+          saveLocale: false,
+          path: 'assets/translations',
+          assetLoader: const _TestTranslationLoader(),
+          child: Builder(
+            builder: (context) => MaterialApp(
+              locale: context.locale,
+              supportedLocales: context.supportedLocales,
+              localizationsDelegates: context.localizationDelegates,
+              theme: AppTheme.light,
+              home: Scaffold(
+                body: AiAnalysisPage(
+                  draft: _draft(),
+                  bugRepository: _FakeBugRepository(),
+                  analysisService: service,
+                  settingsController: controller,
+                  onBugSaved: () {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(service.callCount, 1);
+      expect(service.lastLanguageCode, language);
+      expect(
+        find.byKey(const ValueKey('ai-analysis-edit-severity')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+
+      final pageContext = tester.element(find.byType(AiAnalysisPage));
+      await pageContext.setLocale(Locale(language == 'tr' ? 'en' : 'tr'));
+      await tester.pumpAndSettle();
+      expect(
+        service.callCount,
+        1,
+        reason: 'Language rebuild must not restart analysis',
+      );
+    });
+  }
+
   testWidgets('renders completed mock analysis sections', (tester) async {
     await tester.pumpWidget(
       _analysisHarness(
@@ -26,17 +90,21 @@ void main() {
         analysisService: _FakeAnalysisService(result: _analysis()),
       ),
     );
-    await tester.pump();
-    await tester.pump();
+    await tester.pumpAndSettle();
 
-    expect(find.text('AI Analysis'), findsOneWidget);
+    expect(
+      find.text(
+        'AI has drafted triage metadata, reproduction guidance and QA coverage from your report.',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Severity'), findsOneWidget);
     expect(find.text('Priority'), findsOneWidget);
     expect(find.text('Reproduction Steps'), findsOneWidget);
     expect(find.text('Test Cases'), findsOneWidget);
     expect(find.text('Possible Root Cause'), findsOneWidget);
     expect(find.text('Report Quality'), findsOneWidget);
-    expect(find.text('SAVE BUG REPORT'), findsOneWidget);
+    expect(find.text('Save Bug Report'), findsOneWidget);
   });
 
   testWidgets('saves one final analyzed bug report', (tester) async {
@@ -48,12 +116,11 @@ void main() {
         analysisService: _FakeAnalysisService(result: _analysis()),
       ),
     );
-    await tester.pump();
-    await tester.pump();
+    await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('SAVE BUG REPORT'));
-    await tester.tap(find.text('SAVE BUG REPORT'));
-    await tester.tap(find.text('SAVE BUG REPORT'));
+    await tester.ensureVisible(find.text('Save Bug Report'));
+    await tester.tap(find.text('Save Bug Report'));
+    await tester.tap(find.text('Save Bug Report'));
     await tester.pumpAndSettle();
 
     expect(repository.createdReports, hasLength(1));
@@ -78,8 +145,7 @@ void main() {
     await tester.pumpWidget(
       _analysisHarness(repository: repository, analysisService: service),
     );
-    await tester.pump();
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('Analysis failed'), findsOneWidget);
     expect(find.text('Try Again'), findsOneWidget);
@@ -96,14 +162,18 @@ void main() {
         analysisService: _FakeAnalysisService(result: _analysis()),
       ),
     );
-    await tester.pump();
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Save Bug Report'));
+    await tester.tap(find.text('Save Bug Report'));
     await tester.pump();
 
-    await tester.ensureVisible(find.text('SAVE BUG REPORT'));
-    await tester.tap(find.text('SAVE BUG REPORT'));
-    await tester.pump();
-
-    expect(find.text('AI Analysis'), findsOneWidget);
+    expect(
+      find.text(
+        'AI has drafted triage metadata, reproduction guidance and QA coverage from your report.',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Severity'), findsOneWidget);
     expect(
       find.text('Could not save the bug report. Please try again.'),
@@ -120,8 +190,7 @@ void main() {
         analysisService: _FakeAnalysisService(result: _analysis()),
       ),
     );
-    await tester.pump();
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('ai-analysis-edit-severity')));
     await tester.pumpAndSettle();
@@ -131,7 +200,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('ai-analysis-edit-priority')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('P0'));
+    await tester.tap(find.text('Immediate'));
     await tester.tap(find.text('Apply'));
     await tester.pumpAndSettle();
 
@@ -167,8 +236,8 @@ void main() {
     await tester.tap(find.text('Apply'));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('SAVE BUG REPORT'));
-    await tester.tap(find.text('SAVE BUG REPORT'));
+    await tester.ensureVisible(find.text('Save Bug Report'));
+    await tester.tap(find.text('Save Bug Report'));
     await tester.pumpAndSettle();
 
     final created = repository.createdReports.single;
@@ -210,8 +279,7 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('ai-analysis-edit-severity')));
     await tester.pumpAndSettle();
@@ -225,11 +293,10 @@ void main() {
     );
     await tester.ensureVisible(regenerateTestCases);
     await tester.tap(regenerateTestCases);
-    await tester.pump();
-    await tester.pump();
+    await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('SAVE BUG REPORT'));
-    await tester.tap(find.text('SAVE BUG REPORT'));
+    await tester.ensureVisible(find.text('Save Bug Report'));
+    await tester.tap(find.text('Save Bug Report'));
     await tester.pumpAndSettle();
 
     final created = repository.createdReports.single;
@@ -263,16 +330,15 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('Test Cases'), findsNothing);
     expect(find.text('Possible Root Cause'), findsNothing);
     expect(service.lastPreferences?.testCases, isFalse);
     expect(service.lastPreferences?.rootCause, isFalse);
 
-    await tester.ensureVisible(find.text('SAVE BUG REPORT'));
-    await tester.tap(find.text('SAVE BUG REPORT'));
+    await tester.ensureVisible(find.text('Save Bug Report'));
+    await tester.tap(find.text('Save Bug Report'));
     await tester.pumpAndSettle();
 
     final created = repository.createdReports.single;
@@ -301,8 +367,7 @@ void main() {
         ),
       ),
     );
-    await tester.pump();
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('Severity'), findsOneWidget);
     expect(find.text('Priority'), findsOneWidget);
@@ -323,6 +388,12 @@ Widget _analysisHarness({
   required AiBugAnalysisService analysisService,
   AppSettings settings = AppSettings.defaults,
 }) {
+  final settingsController = SettingsController(
+    repository: InMemorySettingsRepository(initialSettings: settings),
+    initialSettings: settings,
+  );
+  addTearDown(settingsController.dispose);
+
   final router = GoRouter(
     initialLocation: AiAnalysisPage.routePath,
     routes: [
@@ -333,10 +404,7 @@ Widget _analysisHarness({
             draft: _draft(),
             bugRepository: repository,
             analysisService: analysisService,
-            settingsController: SettingsController(
-              repository: InMemorySettingsRepository(initialSettings: settings),
-              initialSettings: settings,
-            ),
+            settingsController: settingsController,
             onBugSaved: () {},
           ),
         ),
@@ -347,8 +415,24 @@ Widget _analysisHarness({
       ),
     ],
   );
+  addTearDown(router.dispose);
 
-  return MaterialApp.router(theme: AppTheme.light, routerConfig: router);
+  return EasyLocalization(
+    supportedLocales: const [Locale('en'), Locale('tr')],
+    startLocale: const Locale('en'),
+    saveLocale: false,
+    path: 'assets/translations',
+    assetLoader: const _TestTranslationLoader(),
+    child: Builder(
+      builder: (context) => MaterialApp.router(
+        locale: context.locale,
+        supportedLocales: context.supportedLocales,
+        localizationsDelegates: context.localizationDelegates,
+        theme: AppTheme.light,
+        routerConfig: router,
+      ),
+    ),
+  );
 }
 
 AiBugAnalysis _analysis() {
@@ -401,12 +485,15 @@ class _FakeAnalysisService implements AiBugAnalysisService {
   BugReport? lastBug;
   AiAnalysisPreferences? lastPreferences;
   int callCount = 0;
+  String? lastLanguageCode;
 
   @override
   Future<AiBugAnalysis> analyze(
     BugReport bug, {
     AiAnalysisPreferences preferences = AiAnalysisPreferences.defaults,
+    String languageCode = 'en',
   }) async {
+    lastLanguageCode = languageCode;
     lastBug = bug;
     lastPreferences = preferences;
     callCount += 1;
@@ -452,4 +539,16 @@ class _FakeBugRepository implements BugRepository {
 
   @override
   Future<void> updateBug(BugReport bug) async {}
+}
+
+class _TestTranslationLoader extends AssetLoader {
+  const _TestTranslationLoader();
+
+  @override
+  Future<Map<String, dynamic>> load(String path, Locale locale) async {
+    return jsonDecode(
+          File('$path/${locale.languageCode}.json').readAsStringSync(),
+        )
+        as Map<String, dynamic>;
+  }
 }

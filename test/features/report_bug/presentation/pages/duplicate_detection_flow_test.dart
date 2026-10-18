@@ -1,37 +1,41 @@
 import 'package:bugpilot_ai/app/app.dart';
-import 'package:bugpilot_ai/features/ai_analysis/data/services/mock_ai_bug_analysis_service.dart';
-import 'package:bugpilot_ai/features/ai_analysis/domain/models/ai_analysis_preferences.dart';
-import 'package:bugpilot_ai/features/ai_analysis/domain/models/ai_bug_analysis.dart';
-import 'package:bugpilot_ai/features/ai_analysis/domain/services/ai_bug_analysis_service.dart';
-import 'package:bugpilot_ai/features/bug_reports/data/repositories/in_memory_bug_repository.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_platform.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_priority.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_severity.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/enums/bug_status.dart';
-import 'package:bugpilot_ai/features/bug_reports/domain/models/bug_report.dart';
-import 'package:bugpilot_ai/features/duplicate_detection/domain/models/duplicate_check_result.dart';
-import 'package:bugpilot_ai/features/duplicate_detection/domain/models/similar_bug_candidate.dart';
-import 'package:bugpilot_ai/features/duplicate_detection/domain/services/bug_duplicate_detection_service.dart';
-import 'package:bugpilot_ai/features/settings/data/repositories/in_memory_settings_repository.dart';
-import 'package:bugpilot_ai/features/settings/domain/models/app_settings.dart';
-import 'package:bugpilot_ai/features/settings/presentation/controllers/settings_controller.dart';
+import 'package:bugpilot_ai/services/mock_ai_bug_analysis_service.dart';
+import 'package:bugpilot_ai/models/ai_analysis_preferences.dart';
+import 'package:bugpilot_ai/models/ai_bug_analysis.dart';
+import 'package:bugpilot_ai/services/ai_bug_analysis_service.dart';
+import 'package:bugpilot_ai/repositories/in_memory_bug_repository.dart';
+import 'package:bugpilot_ai/models/bug_platform.dart';
+import 'package:bugpilot_ai/models/bug_priority.dart';
+import 'package:bugpilot_ai/models/bug_severity.dart';
+import 'package:bugpilot_ai/models/bug_status.dart';
+import 'package:bugpilot_ai/models/bug_report.dart';
+import 'package:bugpilot_ai/models/duplicate_check_result.dart';
+import 'package:bugpilot_ai/models/similar_bug_candidate.dart';
+import 'package:bugpilot_ai/services/bug_duplicate_detection_service.dart';
+import 'package:bugpilot_ai/repositories/in_memory_settings_repository.dart';
+import 'package:bugpilot_ai/models/app_settings.dart';
+import 'package:bugpilot_ai/controllers/settings_controller.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
+  setUpAll(() async {
+    SharedPreferences.setMockInitialValues({});
     binding.platformDispatcher.localeTestValue = const Locale('en');
-  });
-
-  tearDown(() {
-    binding.platformDispatcher.clearLocaleTestValue();
+    await rootBundle.loadString('assets/translations/en.json');
+    await rootBundle.loadString('assets/translations/tr.json');
+    await EasyLocalization.ensureInitialized();
   });
 
   testWidgets('shows similar bugs and continues without losing draft', (
     tester,
   ) async {
+    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
     tester.view.physicalSize = const Size(800, 2200);
     tester.view.devicePixelRatio = 1;
     addTearDown(() {
@@ -54,17 +58,20 @@ void main() {
       ),
     );
 
+    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
     await tester.pumpWidget(
       BugPilotApp(
+        initialLocale: const Locale('en'),
+        saveLocale: false,
         bugRepository: repository,
         aiAnalysisService: analysisService,
         duplicateDetectionService: duplicateService,
       ),
     );
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
 
     await tester.tap(find.text('REPORT'));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
     await _fillLoginBugForm(tester);
 
     await tester.ensureVisible(find.text('Analyze with AI'));
@@ -87,7 +94,12 @@ void main() {
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
 
-    expect(find.text('AI Analysis'), findsOneWidget);
+    expect(
+      find.text(
+        'AI has drafted triage metadata, reproduction guidance and QA coverage from your report.',
+      ),
+      findsOneWidget,
+    );
     expect(analysisService.lastBug?.title, 'Login button stuck loading');
     expect(analysisService.lastBug?.actualBehavior, contains('spinner'));
     expect(await repository.getBugs(), hasLength(1));
@@ -96,6 +108,7 @@ void main() {
   testWidgets('skips remote duplicate check when no local candidates exist', (
     tester,
   ) async {
+    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
     tester.view.physicalSize = const Size(800, 1200);
     tester.view.devicePixelRatio = 1;
     addTearDown(() {
@@ -107,17 +120,20 @@ void main() {
       result: DuplicateCheckResult(matches: const []),
     );
 
+    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
     await tester.pumpWidget(
       BugPilotApp(
+        initialLocale: const Locale('en'),
+        saveLocale: false,
         bugRepository: InMemoryBugRepository(seedBugs: [_profileImageBug()]),
         aiAnalysisService: _CapturingAnalysisService(),
         duplicateDetectionService: duplicateService,
       ),
     );
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
 
     await tester.tap(find.text('REPORT'));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
     await _fillLoginBugForm(tester);
 
     await tester.ensureVisible(find.text('Analyze with AI'));
@@ -126,7 +142,12 @@ void main() {
     await tester.pump();
 
     expect(find.text('Similar bugs found'), findsNothing);
-    expect(find.text('AI Analysis'), findsOneWidget);
+    expect(
+      find.text(
+        'AI has drafted triage metadata, reproduction guidance and QA coverage from your report.',
+      ),
+      findsOneWidget,
+    );
     expect(duplicateService.callCount, 0);
   });
 
@@ -144,16 +165,19 @@ void main() {
       initialSettings: settings,
     );
 
+    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
     await tester.pumpWidget(
       BugPilotApp(
+        initialLocale: const Locale('en'),
+        saveLocale: false,
         bugRepository: InMemoryBugRepository(seedBugs: []),
         settingsController: settingsController,
       ),
     );
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
 
     await tester.tap(find.text('REPORT'));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
 
     expect(find.text('Android'), findsOneWidget);
     expect(find.text('Pixel 9'), findsOneWidget);
@@ -164,6 +188,7 @@ void main() {
   testWidgets('skips local and remote duplicate detection when disabled', (
     tester,
   ) async {
+    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
     tester.view.physicalSize = const Size(800, 1200);
     tester.view.devicePixelRatio = 1;
     addTearDown(() {
@@ -180,18 +205,21 @@ void main() {
       initialSettings: settings,
     );
 
+    addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
     await tester.pumpWidget(
       BugPilotApp(
+        initialLocale: const Locale('en'),
+        saveLocale: false,
         bugRepository: InMemoryBugRepository(seedBugs: [_similarLoginBug()]),
         aiAnalysisService: _CapturingAnalysisService(),
         duplicateDetectionService: duplicateService,
         settingsController: settingsController,
       ),
     );
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
 
     await tester.tap(find.text('REPORT'));
-    await tester.pumpAndSettle();
+    await _settleTranslations(tester);
     await _fillLoginBugForm(tester);
 
     await tester.ensureVisible(find.text('Analyze with AI'));
@@ -200,7 +228,12 @@ void main() {
     await tester.pump();
 
     expect(find.text('Similar bugs found'), findsNothing);
-    expect(find.text('AI Analysis'), findsOneWidget);
+    expect(
+      find.text(
+        'AI has drafted triage metadata, reproduction guidance and QA coverage from your report.',
+      ),
+      findsOneWidget,
+    );
     expect(duplicateService.callCount, 0);
   });
 }
@@ -222,8 +255,9 @@ Future<void> _fillLoginBugForm(WidgetTester tester) async {
     find.byType(TextFormField).at(3),
     'The login spinner remains visible forever.',
   );
-  await tester.ensureVisible(find.text('PLATFORM'));
-  await tester.tap(find.byType(DropdownButtonFormField<BugPlatform>));
+  final platformField = find.byType(DropdownButtonFormField<BugPlatform>);
+  await tester.ensureVisible(platformField);
+  await tester.tap(platformField);
   await tester.pumpAndSettle();
   await tester.tap(find.text('Android').last);
   await tester.pumpAndSettle();
@@ -240,9 +274,14 @@ class _CapturingAnalysisService implements AiBugAnalysisService {
   Future<AiBugAnalysis> analyze(
     BugReport bug, {
     AiAnalysisPreferences preferences = AiAnalysisPreferences.defaults,
+    String languageCode = 'en',
   }) {
     lastBug = bug;
-    return _mock.analyze(bug, preferences: preferences);
+    return _mock.analyze(
+      bug,
+      preferences: preferences,
+      languageCode: languageCode,
+    );
   }
 }
 
@@ -257,6 +296,7 @@ class _FakeDuplicateDetectionService implements BugDuplicateDetectionService {
   Future<DuplicateCheckResult> checkDuplicates({
     required BugReport draft,
     required List<SimilarBugCandidate> candidates,
+    String languageCode = 'en',
   }) async {
     callCount++;
     lastCandidates = candidates;
@@ -304,4 +344,9 @@ BugReport _bug({
     createdAt: DateTime.utc(2026, 8, 19),
     updatedAt: DateTime.utc(2026, 8, 19),
   );
+}
+
+Future<void> _settleTranslations(WidgetTester tester) async {
+  await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+  await tester.pumpAndSettle();
 }
