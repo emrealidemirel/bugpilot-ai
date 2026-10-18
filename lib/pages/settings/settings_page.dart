@@ -50,6 +50,11 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    // The translation helper reads EasyLocalization's current locale without
+    // registering a dependency, so listen here to rebuild every settings
+    // section when the selected locale changes.
+    Localizations.localeOf(context);
+
     return SafeArea(
       child: AnimatedBuilder(
         animation: widget.controller,
