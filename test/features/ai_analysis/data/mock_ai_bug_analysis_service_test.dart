@@ -1,4 +1,4 @@
-import 'package:bugpilot_ai/services/mock_ai_bug_analysis_service.dart';
+import '../../../support/mock_ai_bug_analysis_service.dart';
 import 'package:bugpilot_ai/models/ai_analysis_preferences.dart';
 import 'package:bugpilot_ai/models/bug_platform.dart';
 import 'package:bugpilot_ai/models/bug_priority.dart';

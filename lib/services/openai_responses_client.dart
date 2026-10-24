@@ -22,7 +22,7 @@ import 'ai_analysis_api_client.dart';
 class OpenAiResponsesClient
     implements AiAnalysisApiClient, DuplicateDetectionApiClient {
   OpenAiResponsesClient({
-    this.apiKey = const String.fromEnvironment('OPENAI_API_KEY'),
+    this.apiKey = '',
     this.model = 'gpt-5.6-terra',
     http.Client? httpClient,
     this.timeout = const Duration(seconds: 60),
@@ -34,6 +34,8 @@ class OpenAiResponsesClient
   final String model;
   final Duration timeout;
   final http.Client _httpClient;
+
+  void close() => _httpClient.close();
 
   @override
   Future<AiAnalysisResponse> analyze(
@@ -136,6 +138,13 @@ class OpenAiResponsesClient
     required String formatName,
     required Map<String, dynamic> schema,
   }) async {
+    if (apiKey.trim().isEmpty) {
+      throw const AiAnalysisException(
+        code: AiAnalysisErrorCode.invalidApiKey,
+        message: 'OpenAI API key is not configured.',
+      );
+    }
+
     final response = await _httpClient
         .post(
           _endpoint,

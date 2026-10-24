@@ -1,11 +1,14 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase;
+import 'account_security_service.dart';
+import 'local_data_security.dart';
+import 'package:bugpilot_ai/constants/app_config.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:bugpilot_ai/models/auth_user.dart';
 import 'package:bugpilot_ai/services/auth_service.dart';
 import 'package:bugpilot_ai/services/profile_photo_storage.dart';
 
-class FirebaseAuthService implements AuthService {
+class FirebaseAuthService implements AuthService, AccountSecurityService {
   FirebaseAuthService({
     required this.photoStorage,
     firebase.FirebaseAuth? auth,
@@ -17,6 +20,7 @@ class FirebaseAuthService implements AuthService {
   final firebase.FirebaseAuth _auth;
   final GoogleSignIn _googleSignIn;
   bool _googleInitialized = false;
+  Future<void> Function(String uid)? deleteLocalData;
 
   @override
   AuthUser? get currentUser => _mapUser(_auth.currentUser);
@@ -64,6 +68,7 @@ class FirebaseAuthService implements AuthService {
     await credential.user?.updateDisplayName(
       '${firstName.trim()} ${lastName.trim()}'.trim(),
     );
+    await credential.user?.sendEmailVerification();
   }
 
   @override
@@ -121,10 +126,83 @@ class FirebaseAuthService implements AuthService {
     }
   }
 
+  @override
+  bool get supportsAppleSignIn =>
+      AppConfig.appleSignInEnabled &&
+      !kIsWeb &&
+      defaultTargetPlatform == TargetPlatform.iOS;
+
+  @override
+  bool get passwordAccount =>
+      _auth.currentUser?.providerData.any((p) => p.providerId == 'password') ??
+      false;
+
+  @override
+  Future<void> signInWithApple() async {
+    await _auth.signInWithProvider(
+      firebase.AppleAuthProvider()
+        ..addScope('email')
+        ..addScope('name'),
+    );
+  }
+
+  @override
+  Future<void> sendVerificationEmail() async =>
+      _auth.currentUser?.sendEmailVerification();
+
+  @override
+  Future<void> refreshUser() async {
+    await _auth.currentUser?.reload();
+    await _auth.currentUser?.getIdToken(true);
+  }
+
+  @override
+  Future<void> deleteAccount({String? password}) async {
+    final user = _auth.currentUser;
+    if (user == null) throw StateError('Sign in is required');
+    final uid = user.uid;
+    final cleanup = deleteLocalData;
+    if (cleanup == null) throw StateError('Account cleanup is unavailable');
+    if (passwordAccount) {
+      if (password == null || password.isEmpty) {
+        throw ArgumentError('Password is required');
+      }
+      await user.reauthenticateWithCredential(
+        firebase.EmailAuthProvider.credential(
+          email: user.email!,
+          password: password,
+        ),
+      );
+    } else if (user.providerData.any((p) => p.providerId == 'apple.com')) {
+      final credential = await user.reauthenticateWithProvider(
+        firebase.AppleAuthProvider(),
+      );
+      final code = credential.additionalUserInfo?.authorizationCode;
+      if (code == null) throw StateError('Apple authorization code is missing');
+      await _auth.revokeTokenWithAuthorizationCode(code);
+    } else {
+      await user.reauthenticateWithProvider(firebase.GoogleAuthProvider());
+    }
+    if (_auth.currentUser?.uid != uid) throw StateError('Account changed');
+    // Journal cleanup so an interrupted deletion is completed at next startup.
+    // A failed remote request leaves the user's local reports intact.
+    await LocalDataSecurity.markPendingDeletion(uid);
+    try {
+      await user.delete();
+    } catch (_) {
+      await LocalDataSecurity.clearPendingDeletion();
+      rethrow;
+    }
+    await cleanup(uid);
+    await photoStorage.delete(uid);
+    await LocalDataSecurity.clearPendingDeletion();
+  }
+
   AuthUser? _mapUser(firebase.User? user) => user == null
       ? null
       : AuthUser(
           id: user.uid,
+          emailVerified: user.emailVerified,
           email: user.email ?? '',
           displayName: user.displayName,
           photoUrl: user.photoURL,

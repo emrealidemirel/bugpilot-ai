@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:bugpilot_ai/widgets/delete_bug_dialog.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:bugpilot_ai/utils/localization_extensions.dart';
@@ -161,7 +162,7 @@ class _BugDetailPageState extends State<BugDetailPage> {
     final shouldDelete = await showDialog<bool>(
       context: context,
       builder: (context) {
-        return _DeleteBugDialog(bug: bug);
+        return DeleteBugDialog(bug: bug);
       },
     );
 
@@ -247,131 +248,6 @@ class _BugDetailPageState extends State<BugDetailPage> {
   }
 }
 
-class _DeleteBugDialog extends StatelessWidget {
-  const _DeleteBugDialog({required this.bug});
-
-  final BugReport bug;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final error = colors.error;
-
-    return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      backgroundColor: Colors.transparent,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 440),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: colors.surface,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: colors.outlineVariant),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(28),
-                blurRadius: 32,
-                offset: const Offset(0, 16),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(AppDimensions.spacingXLarge),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: error.withAlpha(18),
-                    shape: BoxShape.circle,
-                  ),
-                  child: SizedBox.square(
-                    dimension: 68,
-                    child: Icon(
-                      Icons.delete_forever_rounded,
-                      color: error,
-                      size: 32,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppDimensions.spacingLarge),
-                Text(
-                  'deleteBugTitle'.tr(),
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: AppDimensions.spacingSmall),
-                Text(
-                  'deleteBugDescription'.tr(),
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
-                    height: 1.45,
-                  ),
-                ),
-                const SizedBox(height: AppDimensions.spacingLarge),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(AppDimensions.spacingMedium),
-                  decoration: BoxDecoration(
-                    color: colors.surfaceContainerHighest.withAlpha(120),
-                    borderRadius: BorderRadius.circular(
-                      AppDimensions.radiusMedium,
-                    ),
-                    border: Border.all(color: colors.outlineVariant),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.bug_report_outlined, color: error),
-                      const SizedBox(width: AppDimensions.spacingMedium),
-                      Expanded(
-                        child: Text(
-                          bug.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppDimensions.spacingXLarge),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.of(context).pop(false),
-                        child: Text('cancelAction'.tr()),
-                      ),
-                    ),
-                    const SizedBox(width: AppDimensions.spacingSmall),
-                    Expanded(
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: error,
-                          foregroundColor: colors.onError,
-                        ),
-                        onPressed: () => Navigator.of(context).pop(true),
-                        icon: const Icon(Icons.delete_outline_rounded),
-                        label: Text('deleteAction'.tr()),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _BugDetailContent extends StatelessWidget {
   const _BugDetailContent({
     required this.bug,
@@ -415,6 +291,18 @@ class _BugDetailContent extends StatelessWidget {
                 ),
                 trailing: PopupMenuButton<_DetailAction>(
                   enabled: !isBusy,
+                  elevation: 8,
+                  color: Theme.of(context).colorScheme.surface,
+                  surfaceTintColor: Colors.transparent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    side: BorderSide(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: 0.12),
+                    ),
+                  ),
+                  menuPadding: const EdgeInsets.all(8),
                   onSelected: (action) {
                     switch (action) {
                       case _DetailAction.edit:
@@ -428,28 +316,25 @@ class _BugDetailContent extends StatelessWidget {
                   itemBuilder: (context) => [
                     PopupMenuItem(
                       value: _DetailAction.edit,
-                      child: Text('editAction'.tr()),
+                      child: _DetailMenuItem(
+                        icon: Icons.edit_outlined,
+                        label: 'editAction'.tr(),
+                      ),
                     ),
                     PopupMenuItem(
                       value: _DetailAction.changeStatus,
-                      child: Text('changeStatusAction'.tr()),
+                      child: _DetailMenuItem(
+                        icon: Icons.swap_horiz_rounded,
+                        label: 'changeStatusAction'.tr(),
+                      ),
                     ),
+                    const PopupMenuDivider(height: 12),
                     PopupMenuItem(
                       value: _DetailAction.delete,
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.delete_outline_rounded,
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                          const SizedBox(width: AppDimensions.spacingSmall),
-                          Text(
-                            'deleteAction'.tr(),
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
-                            ),
-                          ),
-                        ],
+                      child: _DetailMenuItem(
+                        icon: Icons.delete_outline_rounded,
+                        label: 'deleteAction'.tr(),
+                        destructive: true,
                       ),
                     ),
                   ],
@@ -1054,6 +939,43 @@ class _DetailErrorState extends StatelessWidget {
           color: Theme.of(context).colorScheme.error,
         ),
       ),
+    );
+  }
+}
+
+class _DetailMenuItem extends StatelessWidget {
+  const _DetailMenuItem({
+    required this.icon,
+    required this.label,
+    this.destructive = false,
+  });
+  final IconData icon;
+  final String label;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final accent = destructive ? colors.error : colors.primary;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, size: 19, color: accent),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: destructive ? accent : colors.onSurface,
+          ),
+        ),
+      ],
     );
   }
 }

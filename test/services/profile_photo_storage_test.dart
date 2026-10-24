@@ -32,6 +32,23 @@ void main() {
     expect(storage.read('new-user'), isNull);
   });
 
+  test(
+    'migrates photos to encrypted storage without losing other accounts',
+    () async {
+      final old = await ProfilePhotoStorage.create();
+      await old.save('alice', Uint8List.fromList([1, 2, 3]));
+      await old.save('bob', Uint8List.fromList([4, 5, 6]));
+      final key = Hive.generateSecureKey();
+      var encrypted = await ProfilePhotoStorage.create(encryptionKey: key);
+      expect(await Hive.boxExists('profile_photos'), isFalse);
+      await encrypted.delete('alice');
+      await Hive.close();
+      encrypted = await ProfilePhotoStorage.create(encryptionKey: key);
+      expect(encrypted.read('alice'), isNull);
+      expect(encrypted.read('bob'), [4, 5, 6]);
+    },
+  );
+
   test('invalid replacement preserves the saved photo', () async {
     final storage = await ProfilePhotoStorage.create();
     await storage.save('alice', Uint8List.fromList([1, 2, 3]));

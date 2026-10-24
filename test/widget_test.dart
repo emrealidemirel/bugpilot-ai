@@ -3,7 +3,8 @@ import 'dart:typed_data';
 import 'package:bugpilot_ai/app/app.dart';
 import 'package:bugpilot_ai/models/auth_user.dart';
 import 'package:bugpilot_ai/services/auth_service.dart';
-import 'package:bugpilot_ai/services/mock_ai_bug_analysis_service.dart';
+import 'package:bugpilot_ai/services/account_security_service.dart';
+import 'support/mock_ai_bug_analysis_service.dart';
 import 'package:bugpilot_ai/models/ai_analysis_preferences.dart';
 import 'package:bugpilot_ai/models/ai_bug_analysis.dart';
 import 'package:bugpilot_ai/services/ai_bug_analysis_service.dart';
@@ -108,6 +109,101 @@ void main() {
     expect(find.text('Good afternoon'), findsWidgets);
   });
 
+  testWidgets('profile starts as a card and supports edit, cancel and save', (
+    tester,
+  ) async {
+    final service = _SecurityProfileAuthService();
+    await tester.pumpWidget(
+      BugPilotApp(
+        initialLocale: const Locale('en'),
+        saveLocale: false,
+        authService: service,
+      ),
+    );
+    await _settleTranslations(tester);
+    await tester.tap(find.byTooltip('Account menu'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('profile-details-card')), findsOneWidget);
+    expect(find.byType(TextFormField), findsNothing);
+    expect(find.text('Alex Example'), findsOneWidget);
+    expect(find.text('alex@example.com'), findsOneWidget);
+    expect(find.text('Cancel'), findsNothing);
+    expect(find.text('Sign out'), findsOneWidget);
+    expect(find.text('Account and data'), findsOneWidget);
+    await tester.ensureVisible(find.text('Account and data'));
+    await tester.tap(find.text('Account and data'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete my account'), findsOneWidget);
+    expect(find.text('Privacy and data use'), findsOneWidget);
+    Navigator.of(tester.element(find.text('Privacy and data use'))).pop();
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('Edit details'));
+    await tester.ensureVisible(find.text('Account and data'));
+    final primaryRect = tester.getRect(
+      find.widgetWithText(FilledButton, 'Edit details'),
+    );
+    final secondaryRect = tester.getRect(
+      find.widgetWithText(OutlinedButton, 'Sign out'),
+    );
+    final accountAndDataRect = tester.getRect(
+      find.widgetWithText(OutlinedButton, 'Account and data'),
+    );
+    expect(
+      accountAndDataRect.top - secondaryRect.bottom,
+      secondaryRect.top - primaryRect.bottom,
+    );
+    await tester.tap(find.text('Edit details'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.getRect(find.widgetWithText(FilledButton, 'Save details')),
+      primaryRect,
+    );
+    expect(
+      tester.getRect(find.widgetWithText(TextButton, 'Cancel')).bottomRight,
+      secondaryRect.bottomRight,
+    );
+    expect(find.byType(TextFormField), findsNWidgets(3));
+    expect(find.text('Sign out'), findsNothing);
+    await tester.enterText(find.byType(TextFormField).at(0), 'Unsaved');
+    await tester.ensureVisible(find.text('Cancel'));
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(service.saveCount, 0);
+    expect(find.byType(TextFormField), findsNothing);
+    expect(find.text('Alex Example'), findsOneWidget);
+    expect(find.text('Unsaved'), findsNothing);
+
+    await tester.ensureVisible(find.text('Edit details'));
+    await tester.tap(find.text('Edit details'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TextFormField>(find.byType(TextFormField).at(0))
+          .controller!
+          .text,
+      'Alex',
+    );
+    await tester.enterText(find.byType(TextFormField).at(0), '');
+    await tester.ensureVisible(find.text('Save details'));
+    await tester.tap(find.text('Save details'));
+    await tester.pumpAndSettle();
+    expect(service.saveCount, 0);
+    expect(find.byType(TextFormField), findsNWidgets(3));
+
+    await tester.enterText(find.byType(TextFormField).at(0), 'Morgan');
+    await tester.enterText(find.byType(TextFormField).at(1), 'Taylor');
+    await tester.ensureVisible(find.text('Save details'));
+    await tester.tap(find.text('Save details'));
+    await tester.pumpAndSettle();
+    expect(service.saveCount, 1);
+    expect(find.byType(TextFormField), findsNothing);
+    expect(find.text('Morgan Taylor'), findsOneWidget);
+    expect(find.text('Edit details'), findsOneWidget);
+    expect(find.text('Sign out'), findsOneWidget);
+    expect(find.text('Cancel'), findsNothing);
+  });
+
   testWidgets('shows the Firebase error code in the profile message', (
     tester,
   ) async {
@@ -123,7 +219,11 @@ void main() {
 
     await tester.tap(find.byTooltip('Account menu'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Save profile'));
+    await tester.ensureVisible(find.text('Edit details'));
+    await tester.tap(find.text('Edit details'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Save details'));
+    await tester.tap(find.text('Save details'));
     await tester.pumpAndSettle();
 
     expect(
@@ -132,6 +232,8 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(find.text('Save details'), findsOneWidget);
+    expect(find.text('Cancel'), findsOneWidget);
   });
 
   testWidgets('creates a bug report from the report form', (tester) async {
@@ -355,6 +457,49 @@ class _FailingProfileAuthService implements AuthService {
     String? photoContentType,
   }) async {
     throw FirebaseException(plugin: 'firebase_storage', code: 'unauthorized');
+  }
+}
+
+class _SecurityProfileAuthService extends _EditableProfileAuthService
+    implements AccountSecurityService {
+  @override
+  bool get supportsAppleSignIn => false;
+  @override
+  bool get passwordAccount => true;
+  @override
+  Future<void> deleteAccount({String? password}) async {}
+  @override
+  Future<void> refreshUser() async {}
+  @override
+  Future<void> sendVerificationEmail() async {}
+  @override
+  Future<void> signInWithApple() async {}
+}
+
+class _EditableProfileAuthService extends _FailingProfileAuthService {
+  AuthUser _user = const AuthUser(
+    id: 'test-user',
+    email: 'alex@example.com',
+    displayName: 'Alex Example',
+  );
+  int saveCount = 0;
+
+  @override
+  AuthUser get currentUser => _user;
+
+  @override
+  Future<void> updateProfile({
+    required String firstName,
+    required String lastName,
+    Uint8List? photoBytes,
+    String? photoContentType,
+  }) async {
+    saveCount++;
+    _user = AuthUser(
+      id: _user.id,
+      email: _user.email,
+      displayName: '$firstName $lastName',
+    );
   }
 }
 

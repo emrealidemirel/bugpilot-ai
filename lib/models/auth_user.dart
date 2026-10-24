@@ -7,8 +7,10 @@ class AuthUser {
     this.displayName,
     this.photoUrl,
     this.localPhotoBytes,
+    this.emailVerified = false,
   });
 
+  final bool emailVerified;
   final String id;
   final String email;
   final String? displayName;

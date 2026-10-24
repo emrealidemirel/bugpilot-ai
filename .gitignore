@@ -38,9 +38,6 @@ migrate_working_dir/
 .env
 .env.*
 !.env.example
-backend/.env
-backend/.env.*
-!backend/.env.example
 
 # Symbolication related
 app.*.symbols
@@ -52,3 +49,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local signing material and build caches
+android/key.properties
+*.jks
+*.keystore
+android/.kotlin/

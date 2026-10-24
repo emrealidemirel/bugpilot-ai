@@ -34,9 +34,19 @@ class HiveBugRepository implements BugRepository {
   static Future<HiveBugRepository> create({
     List<BugReport>? seedBugs,
     BugAttachmentStorage? attachmentStorage,
+    String? accountNamespace,
+    List<int>? encryptionKey,
   }) async {
-    final bugBox = await Hive.openBox<Map<dynamic, dynamic>>(bugReportsBoxName);
-    final metadataBox = await Hive.openBox<dynamic>(metadataBoxName);
+    final suffix = accountNamespace == null ? '' : '_$accountNamespace';
+    final cipher = encryptionKey == null ? null : HiveAesCipher(encryptionKey);
+    final bugBox = await Hive.openBox<Map<dynamic, dynamic>>(
+      '$bugReportsBoxName$suffix',
+      encryptionCipher: cipher,
+    );
+    final metadataBox = await Hive.openBox<dynamic>(
+      '$metadataBoxName$suffix',
+      encryptionCipher: cipher,
+    );
     await LocalStorageMigrator(metadataBox).migrate();
 
     final repository = HiveBugRepository._(
@@ -44,7 +54,7 @@ class HiveBugRepository implements BugRepository {
       metadataBox: metadataBox,
       attachmentStorage: attachmentStorage ?? BugAttachmentStorage(),
     );
-    await repository._removeLegacyDemoReports();
+    if (accountNamespace == null) await repository._removeLegacyDemoReports();
     final seedsInitialized =
         metadataBox.get(_seedDataInitializedKey, defaultValue: false) == true;
     if (repository._bugBox.isNotEmpty && !seedsInitialized) {
@@ -137,6 +147,13 @@ class HiveBugRepository implements BugRepository {
     final bug = await getBugById(id);
     await _bugBox.delete(id);
     await _attachmentStorage.deleteScreenshot(bug?.screenshot);
+  }
+
+  Future<void> deleteAll() async {
+    for (final id in _bugBox.keys.toList()) {
+      await deleteBug(id as String);
+    }
+    await _metadataBox.clear();
   }
 
   Future<void> close() async {

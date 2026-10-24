@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:bugpilot_ai/services/ai_consent.dart';
+import 'package:bugpilot_ai/services/account_data.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:async';
@@ -8,12 +10,10 @@ import 'package:bugpilot_ai/services/auth_service.dart';
 import 'package:bugpilot_ai/models/auth_user.dart';
 import 'package:bugpilot_ai/widgets/auth_service_scope.dart';
 import 'package:bugpilot_ai/services/openai_responses_client.dart';
-import 'package:bugpilot_ai/services/mock_ai_bug_analysis_service.dart';
 import 'package:bugpilot_ai/services/remote_ai_bug_analysis_service.dart';
 import 'package:bugpilot_ai/services/ai_bug_analysis_service.dart';
 import 'package:bugpilot_ai/repositories/in_memory_bug_repository.dart';
 import 'package:bugpilot_ai/repositories/bug_repository.dart';
-import 'package:bugpilot_ai/services/mock_bug_duplicate_detection_service.dart';
 import 'package:bugpilot_ai/services/remote_bug_duplicate_detection_service.dart';
 import 'package:bugpilot_ai/services/bug_duplicate_detection_service.dart';
 import 'package:bugpilot_ai/repositories/in_memory_settings_repository.dart';
@@ -25,6 +25,7 @@ import 'package:bugpilot_ai/theme/app_theme.dart';
 class BugPilotApp extends StatefulWidget {
   const BugPilotApp({
     this.bugRepository,
+    this.accountData,
     this.aiAnalysisService,
     this.duplicateDetectionService,
     this.settingsController,
@@ -36,6 +37,7 @@ class BugPilotApp extends StatefulWidget {
   });
 
   final BugRepository? bugRepository;
+  final AccountData? accountData;
   final AiBugAnalysisService? aiAnalysisService;
   final BugDuplicateDetectionService? duplicateDetectionService;
   final SettingsController? settingsController;
@@ -49,6 +51,8 @@ class BugPilotApp extends StatefulWidget {
 }
 
 class _BugPilotAppState extends State<BugPilotApp> {
+  final _aiConsent = AiConsent();
+  final _ownedAiClients = <OpenAiResponsesClient>[];
   late final BugRepository _bugRepository;
   late final AiBugAnalysisService _aiAnalysisService;
   late final BugDuplicateDetectionService _duplicateDetectionService;
@@ -99,37 +103,31 @@ class _BugPilotAppState extends State<BugPilotApp> {
     );
   }
 
-  AiBugAnalysisService _createAiAnalysisService() {
-    if (AppConfig.useMockAi) {
-      return const MockAiBugAnalysisService();
-    }
-
-    return RemoteAiBugAnalysisService(
-      apiClient: OpenAiResponsesClient(
-        apiKey: AppConfig.openAiApiKey,
-        model: AppConfig.openAiModel,
-        timeout: AppConfig.aiAnalysisTimeout,
-      ),
+  OpenAiResponsesClient _createClient(Duration timeout) {
+    final client = OpenAiResponsesClient(
+      apiKey: AppConfig.openAiApiKey,
+      model: AppConfig.openAiModel,
+      timeout: timeout,
     );
+    _ownedAiClients.add(client);
+    return client;
   }
 
-  BugDuplicateDetectionService _createDuplicateDetectionService() {
-    if (AppConfig.useMockAi) {
-      return const MockBugDuplicateDetectionService();
-    }
+  AiBugAnalysisService _createAiAnalysisService() => RemoteAiBugAnalysisService(
+    apiClient: _createClient(AppConfig.aiAnalysisTimeout),
+  );
 
-    return RemoteBugDuplicateDetectionService(
-      apiClient: OpenAiResponsesClient(
-        apiKey: AppConfig.openAiApiKey,
-        model: AppConfig.openAiModel,
-        timeout: AppConfig.duplicateCheckTimeout,
-      ),
-    );
-  }
+  BugDuplicateDetectionService _createDuplicateDetectionService() =>
+      RemoteBugDuplicateDetectionService(
+        apiClient: _createClient(AppConfig.duplicateCheckTimeout),
+      );
 
   @override
   void dispose() {
     _router.dispose();
+    for (final client in _ownedAiClients) {
+      client.close();
+    }
     if (_ownsSettingsController) {
       _settingsController.dispose();
     }
@@ -158,6 +156,9 @@ class _BugPilotAppState extends State<BugPilotApp> {
             builder: (context, snapshot) => AuthServiceScope(
               service: widget.authService,
               user: snapshot.data,
+              accountData: widget.accountData,
+              aiConsent: _aiConsent,
+              onDataChanged: () => _bugRefreshSignal.value++,
               child: MaterialApp.router(
                 title: 'BugPilot AI',
                 onGenerateTitle: (context) => 'appTitle'.tr(),

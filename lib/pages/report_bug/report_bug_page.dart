@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:bugpilot_ai/widgets/privacy_controls.dart';
 import 'package:go_router/go_router.dart';
 import 'package:easy_localization/easy_localization.dart';
 
@@ -377,6 +378,7 @@ class _ReportBugPageState extends State<ReportBugPage> {
                           child: BugPilotTechnicalBox(
                             child: TextFormField(
                               controller: _logsController,
+                              maxLength: 20000,
                               enabled: !_isAnalyzing,
                               decoration: InputDecoration(
                                 hintText: 'pasteLogsHint'.tr(),
@@ -492,6 +494,7 @@ class _ReportBugPageState extends State<ReportBugPage> {
       return;
     }
 
+    if (!await requestAiConsent(context) || !mounted) return;
     setState(() {
       _isAnalyzing = true;
     });

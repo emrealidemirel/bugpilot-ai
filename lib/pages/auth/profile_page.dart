@@ -11,6 +11,7 @@ import 'package:bugpilot_ai/constants/app_dimensions.dart';
 import 'package:bugpilot_ai/widgets/bugpilot_components.dart';
 import 'package:bugpilot_ai/models/auth_user.dart';
 import 'package:bugpilot_ai/widgets/auth_service_scope.dart';
+import 'package:bugpilot_ai/widgets/account_management_panel.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({this.isDrawer = false, super.key});
@@ -30,6 +31,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Uint8List? _selectedPhotoBytes;
   String? _selectedPhotoContentType;
   bool _busy = false;
+  bool _isEditing = false;
   bool _syncingProfileFields = false;
   bool _profileFieldsEdited = false;
   String? _loadedProfileIdentity;
@@ -46,7 +48,8 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _syncProfileFields(AuthServiceScope.maybeOf(context)?.user);
+    final scope = AuthServiceScope.maybeOf(context);
+    _syncProfileFields(scope?.service?.currentUser ?? scope?.user);
   }
 
   @override
@@ -161,73 +164,187 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
                 const SizedBox(height: AppDimensions.spacingXLarge),
-                Center(child: _profilePhoto(user)),
-                const SizedBox(height: AppDimensions.spacingSmall),
-                Center(
-                  child: TextButton.icon(
-                    onPressed: _busy ? null : _choosePhotoSource,
-                    icon: const Icon(Icons.edit_rounded),
-                    label: Text('changeProfilePhoto'.tr()),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        theme.colorScheme.primary.withValues(alpha: 0.09),
+                        theme.colorScheme.primary.withValues(alpha: 0.025),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: theme.colorScheme.primary.withValues(alpha: 0.10),
+                    ),
                   ),
-                ),
-                const SizedBox(height: AppDimensions.spacingLarge),
-                Form(
-                  key: _formKey,
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      TextFormField(
-                        controller: _firstNameController,
-                        textCapitalization: TextCapitalization.words,
-                        autofillHints: const [AutofillHints.givenName],
-                        decoration: InputDecoration(
-                          labelText: 'firstNameLabel'.tr(),
-                          prefixIcon: const Icon(Icons.person_outline),
-                        ),
-                        validator: _validateName,
-                      ),
-                      const SizedBox(height: AppDimensions.spacingMedium),
-                      TextFormField(
-                        controller: _lastNameController,
-                        textCapitalization: TextCapitalization.words,
-                        autofillHints: const [AutofillHints.familyName],
-                        decoration: InputDecoration(
-                          labelText: 'lastNameLabel'.tr(),
-                          prefixIcon: const Icon(Icons.person_outline),
-                        ),
-                        validator: _validateName,
-                      ),
-                      const SizedBox(height: AppDimensions.spacingMedium),
-                      TextFormField(
-                        initialValue: user?.email ?? '',
-                        readOnly: true,
-                        decoration: InputDecoration(
-                          labelText: context.l10n.emailLabel,
-                          prefixIcon: const Icon(Icons.email_outlined),
-                        ),
+                      Center(child: _profilePhoto(user)),
+                      const SizedBox(height: AppDimensions.spacingLarge),
+                      // Both views share their measured height so actions never jump
+                      // when switching modes, including with larger text settings.
+                      IndexedStack(
+                        index: _isEditing ? 1 : 0,
+                        alignment: Alignment.center,
+                        children: [
+                          _profileDetailsCard(user),
+                          Form(
+                            key: _formKey,
+                            child: Column(
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: _firstNameController,
+                                        enabled: !_busy,
+                                        textCapitalization:
+                                            TextCapitalization.words,
+                                        autofillHints: const [
+                                          AutofillHints.givenName,
+                                        ],
+                                        decoration: _profileInputDecoration(
+                                          labelText: 'firstNameLabel'.tr(),
+                                        ),
+                                        validator: _validateName,
+                                      ),
+                                    ),
+                                    const SizedBox(
+                                      width: AppDimensions.spacingMedium,
+                                    ),
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: _lastNameController,
+                                        enabled: !_busy,
+                                        textCapitalization:
+                                            TextCapitalization.words,
+                                        autofillHints: const [
+                                          AutofillHints.familyName,
+                                        ],
+                                        decoration: _profileInputDecoration(
+                                          labelText: 'lastNameLabel'.tr(),
+                                        ),
+                                        validator: _validateName,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(
+                                  height: AppDimensions.spacingMedium,
+                                ),
+                                TextFormField(
+                                  initialValue: user?.email ?? '',
+                                  readOnly: true,
+                                  decoration: _profileInputDecoration(
+                                    labelText: context.l10n.emailLabel,
+                                    prefixIcon: const Icon(
+                                      Icons.email_outlined,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: AppDimensions.spacingLarge),
+                const SizedBox(height: AppDimensions.spacingXLarge),
                 FilledButton.icon(
-                  onPressed: user == null || _busy ? null : _saveProfile,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: user == null || _busy
+                      ? null
+                      : _isEditing
+                      ? _saveProfile
+                      : () => setState(() => _isEditing = true),
                   icon: _busy
                       ? const SizedBox.square(
                           dimension: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.check_rounded),
+                      : Icon(
+                          _isEditing ? Icons.check_rounded : Icons.edit_rounded,
+                        ),
                   label: Text(
-                    _busy ? context.l10n.pleaseWait : 'saveProfile'.tr(),
+                    _busy
+                        ? context.l10n.pleaseWait
+                        : (_isEditing ? 'saveProfile' : 'editProfile').tr(),
                   ),
                 ),
                 const SizedBox(height: AppDimensions.spacingMedium),
-                OutlinedButton.icon(
-                  onPressed: user == null || _busy
-                      ? null
-                      : () => AuthServiceScope.of(context)?.signOut(),
-                  icon: const Icon(Icons.logout_rounded),
-                  label: Text(context.l10n.signOut),
+                if (_isEditing)
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: TextButton(
+                      onPressed: user == null || _busy ? null : _cancelEditing,
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(64, 48),
+                        foregroundColor: theme.colorScheme.error,
+                        textStyle: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      child: Text('cancelProfileEditing'.tr()),
+                    ),
+                  )
+                else
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      backgroundColor: theme.colorScheme.surfaceContainerLow,
+                      side: BorderSide(
+                        color: theme.colorScheme.outlineVariant.withValues(
+                          alpha: 0.55,
+                        ),
+                      ),
+                      iconSize: 19,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: user == null || _busy
+                        ? null
+                        : () => AuthServiceScope.of(context)?.signOut(),
+                    icon: const Icon(Icons.logout_rounded),
+                    label: Text(context.l10n.signOut),
+                  ),
+                const SizedBox(height: AppDimensions.spacingMedium),
+                Visibility(
+                  visible: !_isEditing,
+                  maintainState: true,
+                  maintainAnimation: true,
+                  maintainSize: true,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      backgroundColor: theme.colorScheme.surfaceContainerLow,
+                      side: BorderSide(
+                        color: theme.colorScheme.outlineVariant.withValues(
+                          alpha: 0.55,
+                        ),
+                      ),
+                      iconSize: 19,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: _busy
+                        ? null
+                        : () => showAccountManagementSheet(context),
+                    icon: const Icon(Icons.manage_accounts_outlined),
+                    label: Text('accountAndData'.tr()),
+                  ),
                 ),
               ],
             ),
@@ -238,6 +355,97 @@ class _ProfilePageState extends State<ProfilePage> {
 
     if (widget.isDrawer) return profileContent;
     return Scaffold(body: profileContent);
+  }
+
+  void _cancelEditing() {
+    _formKey.currentState?.reset();
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isEditing = false;
+      _selectedPhotoBytes = null;
+      _selectedPhotoContentType = null;
+      _profileFieldsEdited = false;
+      _loadedProfileIdentity = null;
+      final scope = AuthServiceScope.maybeOf(context);
+      _syncProfileFields(scope?.service?.currentUser ?? scope?.user);
+    });
+  }
+
+  Widget _profileDetailsCard(AuthUser? user) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final fullName = [
+      _firstNameController.text.trim(),
+      _lastNameController.text.trim(),
+    ].where((part) => part.isNotEmpty).join(' ');
+    final nameColor = Color.alphaBlend(
+      colors.primary.withValues(alpha: 0.65),
+      colors.onSurface,
+    );
+
+    return Padding(
+      key: const ValueKey('profile-details-card'),
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            fullName.isEmpty ? '—' : fullName,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: nameColor,
+              fontSize: 21,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            user?.email ?? '—',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colors.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: AppDimensions.spacingSmall),
+          TextButton.icon(
+            onPressed: _busy ? null : _choosePhotoSource,
+            style: TextButton.styleFrom(
+              textStyle: theme.textTheme.labelMedium,
+              visualDensity: VisualDensity.compact,
+            ),
+            icon: const Icon(Icons.add_a_photo_outlined, size: 16),
+            label: Text('changeProfilePhoto'.tr()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  InputDecoration _profileInputDecoration({
+    required String labelText,
+    Widget? prefixIcon,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    return InputDecoration(
+      labelText: labelText,
+      prefixIcon: prefixIcon,
+      prefixIconColor: colors.primary,
+      filled: true,
+      fillColor: colors.surface,
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: colors.primary.withValues(alpha: 0.12)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: colors.primary, width: 1.5),
+      ),
+    );
   }
 
   Widget _profilePhoto(AuthUser? user) {
@@ -252,17 +460,27 @@ class _ProfilePageState extends State<ProfilePage> {
       image = null;
     }
 
-    return CircleAvatar(
-      radius: 62,
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-      backgroundImage: image,
-      child: image == null
-          ? Icon(
-              Icons.person_rounded,
-              size: 58,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            )
-          : null,
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Theme.of(context).colorScheme.surface,
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+        ),
+      ),
+      child: CircleAvatar(
+        radius: 36,
+        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+        backgroundImage: image,
+        child: image == null
+            ? Icon(
+                Icons.person_rounded,
+                size: 34,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              )
+            : null,
+      ),
     );
   }
 
@@ -290,8 +508,9 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
       ),
     );
-    if (source == null) return;
+    if (source == null || !mounted) return;
 
+    setState(() => _busy = true);
     try {
       final image = await _imagePicker.pickImage(
         source: source,
@@ -310,8 +529,17 @@ class _ProfilePageState extends State<ProfilePage> {
             ? mimeType.toLowerCase()
             : _contentType(image.name);
       });
+      await _saveProfile(photoOnly: true);
     } catch (_) {
       if (mounted) _showMessage('profilePhotoPickError'.tr(), isError: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _selectedPhotoBytes = null;
+          _selectedPhotoContentType = null;
+        });
+      }
     }
   }
 
@@ -327,8 +555,9 @@ class _ProfilePageState extends State<ProfilePage> {
     };
   }
 
-  Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _saveProfile({bool photoOnly = false}) async {
+    if (!photoOnly && !_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
     final authService = AuthServiceScope.of(context);
     if (authService == null) return;
     if ((_selectedPhotoBytes?.length ?? 0) >= 5 * 1024 * 1024) {
@@ -348,6 +577,10 @@ class _ProfilePageState extends State<ProfilePage> {
       setState(() {
         _selectedPhotoBytes = null;
         _selectedPhotoContentType = null;
+        _isEditing = false;
+        _profileFieldsEdited = false;
+        _loadedProfileIdentity = null;
+        _syncProfileFields(authService.currentUser);
       });
       _showMessage('profileSaved'.tr());
     } catch (error) {

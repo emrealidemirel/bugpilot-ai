@@ -1,5 +1,5 @@
 import 'package:bugpilot_ai/app/app.dart';
-import 'package:bugpilot_ai/services/mock_ai_bug_analysis_service.dart';
+import '../../../../support/mock_ai_bug_analysis_service.dart';
 import 'package:bugpilot_ai/models/ai_analysis_preferences.dart';
 import 'package:bugpilot_ai/models/ai_bug_analysis.dart';
 import 'package:bugpilot_ai/services/ai_bug_analysis_service.dart';

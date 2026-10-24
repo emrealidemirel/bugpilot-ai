@@ -16,9 +16,15 @@ class PersistentSettingsRepository implements SettingsRepository {
 
   final Box<dynamic> _metadataBox;
 
-  static Future<PersistentSettingsRepository> create() async {
+  static Future<PersistentSettingsRepository> create({
+    String? accountNamespace,
+    List<int>? encryptionKey,
+  }) async {
     final metadataBox = await Hive.openBox<dynamic>(
-      HiveBugRepository.metadataBoxName,
+      '${HiveBugRepository.metadataBoxName}${accountNamespace == null ? '' : '_$accountNamespace'}',
+      encryptionCipher: encryptionKey == null
+          ? null
+          : HiveAesCipher(encryptionKey),
     );
     return PersistentSettingsRepository(metadataBox: metadataBox);
   }

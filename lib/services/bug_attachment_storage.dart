@@ -74,6 +74,8 @@ class BugAttachmentStorage {
 
     try {
       final file = File(screenshot.localPath);
+      final directory = await _screenshotDirectory();
+      if (!_isInsideDirectory(file.path, directory.path)) return;
       if (await file.exists()) {
         await file.delete();
       }

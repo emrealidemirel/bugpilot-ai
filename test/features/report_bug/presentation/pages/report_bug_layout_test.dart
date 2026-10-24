@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:bugpilot_ai/theme/app_theme.dart';
 import 'package:bugpilot_ai/repositories/in_memory_bug_repository.dart';
-import 'package:bugpilot_ai/services/mock_bug_duplicate_detection_service.dart';
+import '../../../../support/mock_bug_duplicate_detection_service.dart';
 import 'package:bugpilot_ai/pages/report_bug/report_bug_page.dart';
 import 'package:bugpilot_ai/repositories/in_memory_settings_repository.dart';
 import 'package:bugpilot_ai/controllers/settings_controller.dart';

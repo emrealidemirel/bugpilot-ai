@@ -1,5 +1,5 @@
 import 'package:bugpilot_ai/app/app.dart';
-import 'package:bugpilot_ai/services/mock_ai_bug_analysis_service.dart';
+import '../../../../support/mock_ai_bug_analysis_service.dart';
 import 'package:bugpilot_ai/repositories/in_memory_bug_repository.dart';
 import 'package:bugpilot_ai/models/bug_platform.dart';
 import 'package:bugpilot_ai/models/bug_priority.dart';
@@ -143,6 +143,53 @@ void main() {
     expect(find.text('This field is required.'), findsOneWidget);
   });
 
+  for (final dx in [-600.0, 600.0]) {
+    testWidgets('swipe $dx confirms, cancels and deletes from list', (
+      tester,
+    ) async {
+      final repository = InMemoryBugRepository(seedBugs: [_analyzedBug()]);
+      await tester.pumpWidget(_app(repository));
+      await _settleTranslations(tester);
+      await tester.tap(find.text('BUGS'));
+      await _settleTranslations(tester);
+      final card = find.byKey(const ValueKey('swipe-delete-bug-001'));
+      await tester.drag(card, Offset(dx, 0));
+      await tester.pumpAndSettle();
+      expect(find.text('Delete bug report?'), findsOneWidget);
+      expect(await repository.getBugById('bug-001'), isNotNull);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(card, findsOneWidget);
+      expect(await repository.getBugById('bug-001'), isNotNull);
+      await tester.drag(card, Offset(dx, 0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pumpAndSettle();
+      expect(await repository.getBugById('bug-001'), isNull);
+      expect(card, findsNothing);
+      expect(find.text('Bug report deleted.'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('failed swipe deletion keeps the report available', (
+    tester,
+  ) async {
+    final repository = _FailingDeleteRepository(seedBugs: [_analyzedBug()]);
+    await tester.pumpWidget(_app(repository));
+    await _settleTranslations(tester);
+    await tester.tap(find.text('BUGS'));
+    await _settleTranslations(tester);
+    final card = find.byKey(const ValueKey('swipe-delete-bug-001'));
+    await tester.drag(card, const Offset(-600, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+    expect(await repository.getBugById('bug-001'), isNotNull);
+    expect(card, findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('confirms before deleting a bug', (tester) async {
     final repository = InMemoryBugRepository(seedBugs: [_analyzedBug()]);
 
@@ -240,4 +287,11 @@ BugReport _manualBug() {
 Future<void> _settleTranslations(WidgetTester tester) async {
   await tester.runAsync(() => Future<void>.delayed(Duration.zero));
   await tester.pumpAndSettle();
+}
+
+class _FailingDeleteRepository extends InMemoryBugRepository {
+  _FailingDeleteRepository({super.seedBugs});
+  @override
+  Future<void> deleteBug(String id) async =>
+      throw StateError('Storage unavailable');
 }

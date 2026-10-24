@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:bugpilot_ai/widgets/delete_bug_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -19,6 +21,7 @@ class BugReportsPage extends StatefulWidget {
   const BugReportsPage({
     required this.bugRepository,
     required this.refreshSignal,
+    this.onBugChanged,
     super.key,
   });
 
@@ -26,6 +29,7 @@ class BugReportsPage extends StatefulWidget {
 
   final BugRepository bugRepository;
   final ValueListenable<int> refreshSignal;
+  final VoidCallback? onBugChanged;
 
   @override
   State<BugReportsPage> createState() => _BugReportsPageState();
@@ -43,6 +47,7 @@ String _sortLabel(BuildContext context, BugReportSortOption option) {
 
 class _BugReportsPageState extends State<BugReportsPage> {
   final _searchController = TextEditingController();
+  bool _deletePending = false;
 
   late Future<List<BugReport>> _bugsFuture;
   BugStatus? _statusFilter;
@@ -279,9 +284,20 @@ class _BugReportsPageState extends State<BugReportsPage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         for (final bug in visibleBugs) ...[
-                          BugReportListItem(
-                            bug: bug,
-                            onTap: () => context.go('/bugs/${bug.id}'),
+                          Dismissible(
+                            key: ValueKey('swipe-delete-${bug.id}'),
+                            direction: DismissDirection.horizontal,
+                            background: _deleteBackground(
+                              AlignmentDirectional.centerStart,
+                            ),
+                            secondaryBackground: _deleteBackground(
+                              AlignmentDirectional.centerEnd,
+                            ),
+                            confirmDismiss: (_) => _confirmDelete(bug),
+                            child: BugReportListItem(
+                              bug: bug,
+                              onTap: () => context.go('/bugs/${bug.id}'),
+                            ),
                           ),
                           const SizedBox(height: AppDimensions.spacingLarge),
                         ],
@@ -295,6 +311,62 @@ class _BugReportsPageState extends State<BugReportsPage> {
         ),
       ),
     );
+  }
+
+  Widget _deleteBackground(AlignmentDirectional alignment) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: BoxDecoration(
+        color: colors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.delete_outline_rounded, color: colors.error),
+          const SizedBox(height: 6),
+          Text(
+            'deleteAction'.tr(),
+            style: TextStyle(color: colors.error, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool> _confirmDelete(BugReport bug) async {
+    if (_deletePending) return false;
+    _deletePending = true;
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => DeleteBugDialog(bug: bug),
+      );
+      if (confirmed != true || !mounted) return false;
+      await widget.bugRepository.deleteBug(bug.id);
+      if (!mounted) return false;
+      _reloadBugs();
+      widget.onBugChanged?.call();
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('bugDeleted'.tr())));
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('bugDeleteError'.tr()),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      _deletePending = false;
+    }
+    // The repository refresh removes the item only after successful storage.
+    // Cancellation and storage failures let the card slide back into place.
+    return false;
   }
 
   void _handleSearchChanged() {

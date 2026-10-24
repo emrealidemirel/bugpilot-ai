@@ -28,6 +28,42 @@ void main() {
     }
   });
 
+  test(
+    'encrypted accounts remain isolated across reopen and deletion',
+    () async {
+      final key = Hive.generateSecureKey();
+      var a = await HiveBugRepository.create(
+        accountNamespace: 'a',
+        encryptionKey: key,
+      );
+      var b = await HiveBugRepository.create(
+        accountNamespace: 'b',
+        encryptionKey: key,
+      );
+      final report = _minimalBugReport();
+      await a.createBug(report);
+      expect(await b.getBugs(), isEmpty);
+      await b.createBug(report);
+      await Hive.close();
+      final raw = await File(
+        '${tempDir.path}/bug_reports_a.hive',
+      ).readAsBytes();
+      expect(String.fromCharCodes(raw), isNot(contains(report.title)));
+      a = await HiveBugRepository.create(
+        accountNamespace: 'a',
+        encryptionKey: key,
+      );
+      b = await HiveBugRepository.create(
+        accountNamespace: 'b',
+        encryptionKey: key,
+      );
+      expect(await a.getBugById(report.id), report);
+      await a.deleteAll();
+      expect(await a.getBugs(), isEmpty);
+      expect(await b.getBugById(report.id), report);
+    },
+  );
+
   group('HiveBugRepository', () {
     test('persists a complete bug report after reopening storage', () async {
       var repository = await HiveBugRepository.create(seedBugs: []);

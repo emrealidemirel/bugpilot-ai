@@ -88,6 +88,7 @@ GoRouter createAppRouter({
                   child: BugReportsPage(
                     bugRepository: bugRepository,
                     refreshSignal: bugRefreshSignal,
+                    onBugChanged: onBugChanged,
                   ),
                 ),
                 routes: [

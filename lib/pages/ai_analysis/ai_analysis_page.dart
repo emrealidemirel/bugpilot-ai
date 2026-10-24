@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:bugpilot_ai/widgets/privacy_controls.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:bugpilot_ai/utils/localization_extensions.dart';
@@ -82,7 +83,9 @@ class _AiAnalysisPageState extends State<AiAnalysisPage> {
     // The request reads the locale, which is not available during initState.
     if (!_initialAnalysisStarted && widget.draft != null) {
       _initialAnalysisStarted = true;
-      _runAnalysis();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _runAnalysis();
+      });
     }
   }
 
@@ -162,6 +165,7 @@ class _AiAnalysisPageState extends State<AiAnalysisPage> {
   }
 
   Future<void> _runAnalysis() async {
+    if (!await requestAiConsent(context) || !mounted) return;
     final draft = widget.draft;
     if (draft == null) {
       return;
@@ -226,6 +230,7 @@ class _AiAnalysisPageState extends State<AiAnalysisPage> {
   };
 
   Future<void> _regenerateSection(_AnalysisSection section) async {
+    if (!await requestAiConsent(context) || !mounted) return;
     final draft = widget.draft;
     final current = _analysis;
     if (draft == null || current == null || _regeneratingSection != null) {

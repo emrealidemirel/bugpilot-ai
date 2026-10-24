@@ -51,6 +51,12 @@ void main() {
     },
   );
 
+  test('never deletes an attachment outside its owned directory', () async {
+    final source = await writePng(tempDir, 'external.png');
+    await storage.deleteScreenshot(_screenshot(source.path));
+    expect(await source.exists(), isTrue);
+  });
+
   test('unique names do not collide', () async {
     final firstSource = await writePng(tempDir, 'first.png');
     final secondSource = await writePng(tempDir, 'second.png');

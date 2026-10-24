@@ -1,6 +1,8 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase;
 import 'package:flutter/material.dart';
+import 'package:bugpilot_ai/services/account_security_service.dart';
+import 'package:bugpilot_ai/widgets/privacy_controls.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
@@ -151,12 +153,26 @@ class _SignInPageState extends State<SignInPage> {
                       onPressed: ready && !_busy ? _resetPassword : null,
                       child: Text(l10n.forgotPassword),
                     ),
+                    TextButton(
+                      onPressed: () => showPrivacyInformation(context),
+                      child: Text('privacyPolicyTitle'.tr()),
+                    ),
                     const Divider(height: 28),
                     OutlinedButton.icon(
                       onPressed: ready && !_busy ? _googleSignIn : null,
                       icon: const Icon(Icons.account_circle_outlined),
                       label: Text(l10n.continueWithGoogle),
                     ),
+                    if (widget.authService
+                        case final AccountSecurityService security
+                        when security.supportsAppleSignIn)
+                      OutlinedButton.icon(
+                        onPressed: _busy
+                            ? null
+                            : () => _run(security.signInWithApple),
+                        icon: const Icon(Icons.apple),
+                        label: Text('continueWithApple'.tr()),
+                      ),
                   ],
                 ),
               ),

@@ -179,6 +179,10 @@ class _User extends Fake implements firebase.User {
   @override
   String get uid => 'test-user';
   @override
+  bool get emailVerified => true;
+  @override
+  List<firebase.UserInfo> get providerData => [];
+  @override
   String get email => 'test@example.com';
   @override
   String get displayName => 'Test User';
